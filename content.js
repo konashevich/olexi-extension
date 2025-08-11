@@ -7,6 +7,7 @@
     }
 
     const API_URL = 'http://127.0.0.1:3000/api/olexi-chat';
+    const TOOLS_BASE = 'http://127.0.0.1:3000/api/tools';
 
     // --- 1. Create the Chat UI ---
     const chatContainer = document.createElement('div');
@@ -34,7 +35,7 @@
     // Create toggle button
     const toggleButton = document.createElement('button');
     toggleButton.id = 'olexi-toggle-btn';
-    toggleButton.textContent = '◀ Hide';
+    toggleButton.textContent = '\u25c0 Hide';
     toggleButton.setAttribute('title', 'Toggle Olexi AI Panel');
     
     document.body.appendChild(chatContainer);
@@ -56,12 +57,12 @@
             document.body.classList.add('olexi-collapsed');
             chatContainer.classList.add('collapsed');
             toggleBtn.classList.add('collapsed');
-            toggleBtn.textContent = '▶ Show Olexi';
+            toggleBtn.textContent = '\u25b6 Show Olexi';
         } else {
             document.body.classList.remove('olexi-collapsed');
             chatContainer.classList.remove('collapsed');
             toggleBtn.classList.remove('collapsed');
-            toggleBtn.textContent = '◀ Hide';
+            toggleBtn.textContent = '\u25c0 Hide';
         }
     });
 
@@ -106,70 +107,118 @@
         showLoadingIndicator();
 
         try {
-            const response = await callOlexiAPI(userPrompt);
+            // New MCP-like orchestration via bridge endpoints
+            const plan = await postJson(`${TOOLS_BASE}/plan_search`, { prompt: userPrompt });
+            const results = await postJson(`${TOOLS_BASE}/search_austlii`, { query: plan.query, databases: plan.databases });
+            const summary = await postJson(`${TOOLS_BASE}/summarize_results`, { prompt: userPrompt, results });
+            const built = await postJson(`${TOOLS_BASE}/build_search_url`, { query: plan.query, databases: plan.databases });
+
             removeLoadingIndicator();
-            displayMessage(response.ai_response, 'ai', response.search_results_url);
+            displayMessage(summary.markdown, 'ai', built.url);
         } catch (error) {
             removeLoadingIndicator();
             console.error('Olexi AI Error:', error);
             
-            // Show more specific error messages
-            let errorMessage = 'Sorry, I encountered an error. Please try again.';
-            if (error.message.includes('timed out')) {
-                errorMessage = 'Request timed out after 60 seconds. The query may be too complex or the server is busy. Please try again.';
-            } else if (error.message.includes('Failed to fetch')) {
-                errorMessage = 'Could not connect to Olexi server. Please check if the server is running on port 3000.';
-            } else if (error.message.includes('500')) {
-                errorMessage = 'Server error occurred. Please check the server logs for details.';
-            } else if (error.message) {
-                errorMessage = `Error: ${error.message}`;
+            // Distinguish the cause clearly for the user: AI vs AustLII vs Network
+            let errorMessage = '';
+            const msg = typeof error?.message === 'string' ? error.message : '';
+            const detail = typeof error?.detail === 'string' ? error.detail : '';
+            const status = typeof error?.status === 'number' ? error.status : undefined;
+
+            const combined = `${detail} ${msg}`;
+
+            if (combined.match(/AustLII is not accessible/i)) {
+                // AustLII outage or block
+                errorMessage = 'AustLII is not responding. Source data is temporarily unavailable. Please try again later.';
+                // Optionally surface health info if available
+                try {
+                    const health = await getJson('http://127.0.0.1:3000/austlii/health');
+                    if (health && typeof health.status !== 'undefined') {
+                        errorMessage += `\nDetails: status ${health.status}${health.cached ? ' (cached)' : ''}${health.error ? `, ${health.error}` : ''}.`;
+                    }
+                } catch (_) { /* ignore health fetch errors */ }
+            } else if (
+                combined.match(/AI is not accessible/i) ||
+                combined.match(/AI planning failed/i) ||
+                combined.match(/AI summarization failed/i)
+            ) {
+                // AI service or key issue
+                errorMessage = 'AI service unavailable. Please configure GOOGLE_API_KEY on the server and retry.';
+            } else if (msg.includes('Failed to fetch')) {
+                errorMessage = 'Cannot reach the Olexi server. Ensure it is running on http://127.0.0.1:3000.';
+            } else if (msg.includes('The operation was aborted') || msg.includes('aborted')) {
+                errorMessage = 'Request was aborted (timeout). Please try again.';
+            } else if (typeof status === 'number') {
+                errorMessage = `Request failed (HTTP ${status}). ${detail || 'Please try again.'}`;
+            } else {
+                errorMessage = detail || msg || 'Something went wrong. Please try again.';
             }
-            
+
+            // Prefix a clear cause label
+            if (/AustLII is not responding/i.test(errorMessage)) {
+                errorMessage = 'Cause: AustLII unavailable\n' + errorMessage;
+            } else if (/AI service unavailable/i.test(errorMessage) || /AI is not accessible/i.test(errorMessage)) {
+                errorMessage = 'Cause: AI unavailable\n' + errorMessage;
+            } else if (/Cannot reach the Olexi server/i.test(errorMessage)) {
+                errorMessage = 'Cause: Network/server\n' + errorMessage;
+            }
+
             displayMessage(errorMessage, 'ai');
         }
     });
 
     // --- 5. API Communication ---
-    async function callOlexiAPI(prompt) {
-        console.log('Making API request to:', API_URL);
-        console.log('Request payload:', { prompt, context_url: window.location.href });
-        
-        // Add timeout to the fetch request
+    // Removed legacy /api/olexi-chat fallback. This tool is AI-only by design.
+
+    async function postJson(url, body) {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
-        
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
         try {
-            const response = await fetch(API_URL, {
+            const res = await fetch(url, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    prompt: prompt,
-                    context_url: window.location.href // Send current page URL as context
-                }),
-                signal: controller.signal
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+                signal: controller.signal,
             });
-
             clearTimeout(timeoutId);
-            console.log('Response status:', response.status);
-            console.log('Response ok:', response.ok);
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Error response body:', errorText);
-                throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+            if (!res.ok) {
+                // Attempt to parse FastAPI error object {detail: "..."}
+                let detail = '';
+                try {
+                    const data = await res.clone().json();
+                    if (data && typeof data.detail === 'string') detail = data.detail;
+                } catch (_) {
+                    try {
+                        const text = await res.text();
+                        detail = text || '';
+                    } catch (_) { /* ignore */ }
+                }
+                const err = new Error(`HTTP ${res.status}: ${detail || res.statusText}`);
+                // Attach structured fields for downstream handling
+                err.detail = detail;
+                err.status = res.status;
+                throw err;
             }
-            
-            const jsonResponse = await response.json();
-            console.log('Success response:', jsonResponse);
-            return jsonResponse;
-        } catch (error) {
+            return await res.json();
+        } catch (e) {
             clearTimeout(timeoutId);
-            if (error.name === 'AbortError') {
-                throw new Error('Request timed out after 60 seconds');
+            throw e;
+        }
+    }
+
+    async function getJson(url) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        try {
+            const res = await fetch(url, { method: 'GET', signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
             }
-            throw error;
+            return await res.json();
+        } catch (e) {
+            clearTimeout(timeoutId);
+            throw e;
         }
     }
 
@@ -194,7 +243,7 @@
         if (sender === 'ai' && searchUrl) {
             const linkElement = document.createElement('a');
             linkElement.href = searchUrl;
-            linkElement.textContent = '📄 View full search results on AustLII';
+            linkElement.textContent = '\ud83d\udcc4 View full search results on AustLII';
             linkElement.target = '_blank';
             linkElement.style.display = 'block';
             linkElement.style.marginTop = '12px';
@@ -216,7 +265,7 @@
         const loadingElement = document.createElement('div');
         loadingElement.id = 'olexi-loading';
         loadingElement.classList.add('olexi-message', 'ai-message');
-        loadingElement.innerHTML = '🔍 Searching Australian legal databases...<br><small>This may take 30-60 seconds for comprehensive results</small>';
+        loadingElement.innerHTML = '\ud83d\udd0d Searching Australian legal databases...<br><small>This may take 30-60 seconds for comprehensive results</small>';
         messagesContainer.appendChild(loadingElement);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
