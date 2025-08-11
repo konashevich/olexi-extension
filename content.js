@@ -6,7 +6,6 @@
         return;
     }
 
-    const API_URL = 'http://127.0.0.1:3000/api/olexi-chat';
     const TOOLS_BASE = 'http://127.0.0.1:3000/api/tools';
 
     // --- 1. Create the Chat UI ---
@@ -24,10 +23,11 @@
         <div class="olexi-welcome">
             <h3>Welcome to Olexi AI</h3>
             <p>Ask questions about Australian law and I'll search through legal databases to provide you with relevant cases, legislation, and analysis.</p>
+            <p><small>Tip: Press Ctrl+Enter to send your question.</small></p>
         </div>
         <div id="olexi-messages"></div>
         <form id="olexi-input-form">
-            <textarea id="olexi-input" placeholder="Ask a legal question about Australian law..." rows="2"></textarea>
+            <textarea id="olexi-input" placeholder="Ask a legal question about Australian law… (Ctrl+Enter to send)" title="Press Ctrl+Enter to send" rows="2"></textarea>
             <button id="olexi-send-btn" type="submit">Send Question</button>
         </form>
     `;
