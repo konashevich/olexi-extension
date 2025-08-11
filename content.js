@@ -8,6 +8,49 @@
 
     const TOOLS_BASE = 'http://127.0.0.1:3000/api/tools';
 
+    // Retrieve API key from extension storage; prompt once if missing
+    async function getApiKey() {
+        return await new Promise((resolve, reject) => {
+            try {
+                chrome.storage?.local.get(['olexi_api_key'], (items) => {
+                    const existing = items?.olexi_api_key;
+                    if (existing && typeof existing === 'string' && existing.trim()) {
+                        resolve(existing.trim());
+                        return;
+                    }
+                    const entered = window.prompt('Enter your Olexi API key to authorize the extension:');
+                    if (!entered || !entered.trim()) {
+                        reject(new Error('Missing API key'));
+                        return;
+                    }
+                    const key = entered.trim();
+                    try {
+                        chrome.storage?.local.set({ olexi_api_key: key }, () => resolve(key));
+                    } catch (_) {
+                        resolve(key);
+                    }
+                });
+            } catch (e) {
+                // Fallback to simple prompt/localStorage if chrome.storage is unavailable
+                try {
+                    let key = localStorage.getItem('olexi_api_key');
+                    if (!key) {
+                        const entered = window.prompt('Enter your Olexi API key to authorize the extension:');
+                        if (!entered || !entered.trim()) {
+                            reject(new Error('Missing API key'));
+                            return;
+                        }
+                        key = entered.trim();
+                        localStorage.setItem('olexi_api_key', key);
+                    }
+                    resolve(key);
+                } catch (err) {
+                    reject(err);
+                }
+            }
+        });
+    }
+
     // --- 1. Create the Chat UI ---
     const chatContainer = document.createElement('div');
     chatContainer.id = 'olexi-chat-container';
@@ -174,9 +217,10 @@
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 60000);
         try {
+            const apiKey = await getApiKey();
             const res = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey, 'X-Extension-Id': 'olexi-local' },
                 body: JSON.stringify(body),
                 signal: controller.signal,
             });
@@ -200,7 +244,7 @@
                 throw err;
             }
             return await res.json();
-        } catch (e) {
+    } catch (e) {
             clearTimeout(timeoutId);
             throw e;
         }
