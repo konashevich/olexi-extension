@@ -3,8 +3,6 @@
 (function() {
     if (document.getElementById('olexi-chat-container')) return; // run once
 
-    const TOOLS_BASE = 'http://127.0.0.1:3000/api/tools';
-
     // --- Authorization (host-side only) ---
     async function getApiKey() {
         return await new Promise((resolve, reject) => {
@@ -47,11 +45,7 @@
         <div class="olexi-welcome">
             <h3>Welcome to Olexi</h3>
             <p>Enter a legal research prompt. Olexi will search AustLII using MCP tools. No server-side AI is used.</p>
-            <p><small>Tip: Press Ctrl+Enter to send. Click the filter to adjust databases.</small></p>
-        </div>
-        <div id="olexi-dbbar" style="padding:8px 12px; border-bottom:1px solid #e2e8f0; background:#fff; display:flex; gap:8px; align-items:center;">
-            <button id="olexi-db-filter" type="button" title="Choose databases" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; cursor:pointer;">Databases</button>
-            <div id="olexi-db-summary" style="font-size:12px; color:#334155; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Loading databases…</div>
+            <p><small>Tip: Press Ctrl+Enter to send.</small></p>
         </div>
         <div id="olexi-messages"></div>
         <form id="olexi-input-form">
@@ -72,8 +66,7 @@
     const inputForm = document.getElementById('olexi-input-form');
     const inputField = document.getElementById('olexi-input');
     const toggleBtn = document.getElementById('olexi-toggle-btn');
-    const dbFilterBtn = document.getElementById('olexi-db-filter');
-    const dbSummary = document.getElementById('olexi-db-summary');
+    // No database filter in primary UX
 
     // Toggle
     let isCollapsed = false;
@@ -104,87 +97,9 @@
     });
     document.addEventListener('keydown', function(e) { if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'O') { e.preventDefault(); toggleBtn.click(); } });
 
-    // --- Databases state ---
-    let ALL_DATABASES = [];
-    let selectedDbCodes = new Set();
+    // No database selection UI
 
-    function summarizeDbSelection() {
-        if (!ALL_DATABASES.length) { dbSummary.textContent = 'Loading databases…'; return; }
-        if (!selectedDbCodes.size) { dbSummary.textContent = 'No databases selected (will auto-select based on prompt)'; return; }
-        const names = ALL_DATABASES.filter(d => selectedDbCodes.has(d.code)).map(d => d.name);
-        dbSummary.textContent = `${names.slice(0,3).join(', ')}${names.length>3 ? ` +${names.length-3} more` : ''}`;
-    }
-
-    function chooseDatabasesFromPrompt(prompt) {
-        // Minimal heuristics: detect HCA, NSW, VIC, QLD, WA, SA, ACT, NT
-        const p = (prompt||'').toLowerCase();
-        const picks = [];
-        const find = code => ALL_DATABASES.find(d => d.code === code);
-        if (/\b(hca|high court)\b/.test(p)) { if (find('au/cases/cth/HCA')) picks.push('au/cases/cth/HCA'); }
-        if (/\bnsw\b/.test(p)) { if (find('au/cases/nsw')) picks.push('au/cases/nsw'); }
-        if (/\bvic(toria|)\b/.test(p)) { if (find('au/cases/vic')) picks.push('au/cases/vic'); }
-        if (/\bqld\b/.test(p)) { if (find('au/cases/qld')) picks.push('au/cases/qld'); }
-        if (/\bwa\b/.test(p)) { if (find('au/cases/wa')) picks.push('au/cases/wa'); }
-        if (/\bsa\b/.test(p)) { if (find('au/cases/sa')) picks.push('au/cases/sa'); }
-        if (/\bact\b/.test(p)) { if (find('au/cases/act/ACTSC')) picks.push('au/cases/act/ACTSC'); }
-        if (/\bnt\b/.test(p)) { if (find('au/cases/nt/NTSC')) picks.push('au/cases/nt/NTSC'); }
-        // Default federal anchors
-        if (!picks.length) {
-            if (find('au/cases/cth/HCA')) picks.push('au/cases/cth/HCA');
-            if (find('au/cases/cth/FCA')) picks.push('au/cases/cth/FCA');
-        }
-        return Array.from(new Set(picks));
-    }
-
-    async function loadDatabases() {
-        try {
-            const list = await getJson(`${TOOLS_BASE}/databases`);
-            if (Array.isArray(list)) ALL_DATABASES = list; else ALL_DATABASES = [];
-            summarizeDbSelection();
-        } catch (e) {
-            ALL_DATABASES = [];
-            dbSummary.textContent = 'Failed to load databases';
-        }
-    }
-    loadDatabases();
-
-    // Simple selector modal
-    dbFilterBtn.addEventListener('click', () => {
-        if (!ALL_DATABASES.length) return;
-        const modal = document.createElement('div');
-        modal.style.position = 'fixed';
-        modal.style.top = '0'; modal.style.left = '0'; modal.style.right = '0'; modal.style.bottom = '0';
-        modal.style.background = 'rgba(0,0,0,0.3)';
-        modal.style.zIndex = '10002';
-        const pane = document.createElement('div');
-        pane.style.position = 'absolute'; pane.style.top = '10%'; pane.style.left = '50%'; pane.style.transform = 'translateX(-50%)';
-        pane.style.width = '520px'; pane.style.maxHeight = '70%'; pane.style.overflow = 'auto';
-        pane.style.background = '#fff'; pane.style.border = '1px solid #e2e8f0'; pane.style.borderRadius = '12px'; pane.style.padding = '12px';
-        const title = document.createElement('div'); title.textContent = 'Select databases'; title.style.fontWeight = 'bold'; title.style.marginBottom = '8px';
-        const listEl = document.createElement('div');
-        listEl.style.display = 'grid'; listEl.style.gridTemplateColumns = '1fr 1fr'; listEl.style.gap = '6px 12px';
-        ALL_DATABASES.forEach(db => {
-            const item = document.createElement('label'); item.style.fontSize = '12px'; item.style.display = 'flex'; item.style.gap = '6px'; item.style.alignItems = 'start';
-            const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = selectedDbCodes.has(db.code);
-            cb.addEventListener('change', () => { if (cb.checked) selectedDbCodes.add(db.code); else selectedDbCodes.delete(db.code); });
-            item.appendChild(cb);
-            const span = document.createElement('span'); span.textContent = `${db.name}`; span.title = db.description || '';
-            item.appendChild(span);
-            listEl.appendChild(item);
-        });
-        const actions = document.createElement('div'); actions.style.marginTop = '10px'; actions.style.display = 'flex'; actions.style.gap = '8px'; actions.style.justifyContent = 'flex-end';
-        const applyBtn = document.createElement('button'); applyBtn.textContent = 'Apply'; applyBtn.style.padding = '6px 10px'; applyBtn.style.border = '1px solid #cbd5e1'; applyBtn.style.borderRadius = '6px'; applyBtn.style.background = '#f8fafc';
-        applyBtn.addEventListener('click', () => { summarizeDbSelection(); document.body.removeChild(modal); });
-        const cancelBtn = document.createElement('button'); cancelBtn.textContent = 'Cancel'; cancelBtn.style.padding = '6px 10px'; cancelBtn.style.border = '1px solid #cbd5e1'; cancelBtn.style.borderRadius = '6px'; cancelBtn.style.background = '#fff';
-        cancelBtn.addEventListener('click', () => { document.body.removeChild(modal); });
-        actions.appendChild(cancelBtn); actions.appendChild(applyBtn);
-        pane.appendChild(title); pane.appendChild(listEl); pane.appendChild(actions);
-        modal.appendChild(pane);
-        modal.addEventListener('click', (e) => { if (e.target === modal) document.body.removeChild(modal); });
-        document.body.appendChild(modal);
-    });
-
-    // --- Submit flow: host-orchestrated, MCP-only tools ---
+    // --- Submit flow: host-orchestrated, streaming session to backend ---
     inputForm.addEventListener('submit', async (event) => {
         event.preventDefault();
         const userPrompt = inputField.value.trim();
@@ -193,20 +108,8 @@
         inputField.value = ''; inputField.style.height = 'auto';
         showLoadingIndicator();
         try {
-            // Determine databases: user-selected or heuristic from prompt
-            let dbCodes = Array.from(selectedDbCodes);
-            if (!dbCodes.length) dbCodes = chooseDatabasesFromPrompt(userPrompt);
-            if (!dbCodes.length) throw new Error('No databases selected and none inferred from prompt. Use the Databases button to select.');
-
-            // Treat prompt as boolean query (host agent can be improved later)
-            const query = userPrompt;
-
-            const results = await postJson(`${TOOLS_BASE}/search_austlii`, { query, databases: dbCodes });
-            const built = await postJson(`${TOOLS_BASE}/build_search_url`, { query, databases: dbCodes });
-
-            removeLoadingIndicator();
-            const md = renderResultsMarkdown(results);
-            displayMessage(md, 'ai', built.url);
+            const apiKey = await getApiKey();
+            await streamSession(userPrompt, apiKey);
         } catch (error) {
             removeLoadingIndicator();
             console.error('Olexi Error:', error);
@@ -216,44 +119,76 @@
         }
     });
 
-    // --- HTTP helpers ---
-    async function postJson(url, body) {
+    // --- Streaming SSE over POST to /session/research ---
+    async function streamSession(prompt, apiKey) {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000);
+        const timeoutId = setTimeout(() => controller.abort(), 120000);
+        let shareUrl = null;
         try {
-            const apiKey = await getApiKey();
-            const res = await fetch(url, {
+            const res = await fetch('http://127.0.0.1:3000/session/research', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey, 'X-Extension-Id': 'olexi-local' },
-                body: JSON.stringify(body),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream',
+                    'X-API-Key': apiKey,
+                    'X-Extension-Id': 'olexi-local'
+                },
+                body: JSON.stringify({ prompt }),
                 signal: controller.signal,
             });
-            clearTimeout(timeoutId);
-            if (!res.ok) {
+            if (!res.ok || !res.body) {
                 let detail = '';
-                try { const data = await res.clone().json(); if (data && typeof data.detail === 'string') detail = data.detail; } catch {}
-                try { if (!detail) detail = await res.text(); } catch {}
-                const err = new Error(detail || res.statusText);
-                err.status = res.status; // @ts-ignore
-                throw err;
+                try { detail = await res.text(); } catch {}
+                throw new Error(detail || res.statusText || `HTTP ${res.status}`);
             }
-            return await res.json();
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let buffer = '';
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                let idx;
+                while ((idx = buffer.indexOf('\n\n')) >= 0) {
+                    const raw = buffer.slice(0, idx);
+                    buffer = buffer.slice(idx + 2);
+                    const lines = raw.split('\n');
+                    let event = null;
+                    let data = '';
+                    for (const line of lines) {
+                        if (line.startsWith('event:')) event = line.slice(6).trim();
+                        else if (line.startsWith('data:')) data += line.slice(5).trim();
+                    }
+                    if (!event) continue;
+                    try {
+                        const payload = data ? JSON.parse(data) : {};
+                        if (event === 'progress') {
+                            // Could update loading text here
+                        } else if (event === 'results_preview') {
+                            removeLoadingIndicator();
+                            const items = Array.isArray(payload.items) ? payload.items : [];
+                            const md = renderResultsMarkdown(items);
+                            displayMessage(md, 'ai');
+                        } else if (event === 'answer') {
+                            removeLoadingIndicator();
+                            shareUrl = payload.url || null;
+                            const md = typeof payload.markdown === 'string' ? payload.markdown : 'No answer.';
+                            displayMessage(md, 'ai', shareUrl);
+                        } else if (event === 'error') {
+                            removeLoadingIndicator();
+                            const msg = payload.detail || 'Error during research session.';
+                            displayMessage(msg, 'ai');
+                        }
+                    } catch (e) {
+                        // ignore parse errors for partial chunks
+                    }
+                }
+            }
+            clearTimeout(timeoutId);
         } catch (e) {
             clearTimeout(timeoutId);
             throw e;
         }
-    }
-
-    async function getJson(url) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
-        try {
-            const apiKey = await getApiKey();
-            const res = await fetch(url, { method: 'GET', signal: controller.signal, headers: { 'X-API-Key': apiKey, 'X-Extension-Id': 'olexi-local' } });
-            clearTimeout(timeoutId);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return await res.json();
-        } catch (e) { clearTimeout(timeoutId); throw e; }
     }
 
     // --- Rendering ---
@@ -289,6 +224,26 @@
         messagesContainer.appendChild(el);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
+
+    // Delegate clicks on special olexi://ask links to trigger a new session with the link text as the prompt
+    messagesContainer.addEventListener('click', async (e) => {
+        const a = e.target?.closest('a');
+        if (!a) return;
+        try {
+            const url = new URL(a.getAttribute('href'));
+            if (url.protocol === 'olexi:' && url.hostname === 'ask') {
+                e.preventDefault();
+                const prompt = a.textContent?.trim();
+                if (!prompt) return;
+                displayMessage(prompt, 'user');
+                showLoadingIndicator();
+                const apiKey = await getApiKey();
+                await streamSession(prompt, apiKey);
+            }
+        } catch {
+            // ignore non-URL or unsupported
+        }
+    });
 
     function showLoadingIndicator() {
         const el = document.createElement('div');
