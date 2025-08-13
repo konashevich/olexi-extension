@@ -125,7 +125,8 @@
         const timeoutId = setTimeout(() => controller.abort(), 120000);
         let shareUrl = null;
         try {
-            const res = await fetch('http://127.0.0.1:3000/session/research', {
+            const base = (window.OLEXI_HOST_URL || 'http://127.0.0.1:3000');
+            const res = await fetch(base + '/session/research', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

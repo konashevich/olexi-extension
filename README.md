@@ -53,8 +53,16 @@ Extension settings:
 
 ## Development
 - Load the extension (Developer Mode in Chromium‑based browsers) from `olexi-extension/`.
-- Start the host backend (FastAPI/uvicorn) from the project root; ensure `/session/research` and `/mcp` are reachable on `http://127.0.0.1:3000`.
+- Start the extension host backend (FastAPI/uvicorn) that the content script talks to. It connects to the remote MCP by default.
+  - App path: `olexi-extension/server/main:app`
+  - Default MCP endpoint: `https://olexi-mcp-root-au-691931843514.australia-southeast1.run.app/`
+  - Override with env: `MCP_URL=https://...` if needed
+  - The content script posts to `http://127.0.0.1:3000/session/research` by default. You can change this at runtime by setting `window.OLEXI_HOST_URL` before the script runs.
 - Ensure required Python dependencies are installed (see project `requirements.txt`).
+
+Notes on separation
+- The MCP server now runs remotely (Cloud Run) and only exposes tools. The local host server plans and summarises and calls the MCP over Streamable HTTP.
+- If you also run the monolithic root server (`main.py`), set `MCP_URL` there to point at the same remote MCP to avoid using local `/mcp`.
 
 ## Limitations
 - Upstream (AustLII) latency may vary; health probes can time out yet the session still proceeds.

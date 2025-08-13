@@ -8,8 +8,9 @@
   ],
   "host_permissions": [
     "*://*.austlii.edu.au/*",
-    "http://127.0.0.1:3000/*",
-    "http://localhost:3000/*"
+  "http://127.0.0.1:3000/*",
+  "http://localhost:3000/*",
+  "https://olexi-mcp-root-au-691931843514.australia-southeast1.run.app/*"
   ],
   "content_scripts": [
     {
