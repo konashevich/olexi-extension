@@ -20,10 +20,20 @@ from .host_agent import HOST_AI
 
 app = FastAPI(title="Olexi Extension Host", version="1.0.0", description="Serves the extension UI and hosts research sessions via remote MCP")
 
-# CORS for content scripts
+# CORS for content scripts (configurable)
+_allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "*")
+_allowed_origins: List[str]
+if _allowed_origins_env.strip() == "*":
+    _allowed_origins = ["*"]
+else:
+    _allowed_origins = [o.strip() for o in _allowed_origins_env.split(",") if o.strip()]
+
+_allowed_origin_regex = os.getenv("ALLOWED_ORIGIN_REGEX")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
+    allow_origin_regex=_allowed_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

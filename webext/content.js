@@ -169,7 +169,7 @@
         const timeoutId = setTimeout(() => controller.abort(), 120000);
         let shareUrl = null;
         try {
-            const base = (window.OLEXI_HOST_URL || 'http://127.0.0.1:3000');
+            const base = (window.OLEXI_HOST_URL || 'https://olexi-extension-host-655512577217.australia-southeast1.run.app');
             const res = await fetch(base + '/session/research', {
                 method: 'POST',
                 headers: {

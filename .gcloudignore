@@ -1,0 +1,22 @@
+# Build context for extension host only
+# This file lives under olexi-extension/ so Cloud Build can be run from this folder.
+
+# Python virtual envs and caches
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Node caches
+node_modules/
+dist/
+build/
+
+# Editors
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Local secrets
+server/.env

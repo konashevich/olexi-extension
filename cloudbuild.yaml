@@ -1,0 +1,15 @@
+timeout: "1200s"
+steps:
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-f"
+      - "server/Dockerfile"
+      - "-t"
+      - "australia-southeast1-docker.pkg.dev/$PROJECT_ID/olexi-ext/olexi-extension-host:$BUILD_ID"
+      - "-t"
+      - "australia-southeast1-docker.pkg.dev/$PROJECT_ID/olexi-ext/olexi-extension-host:latest"
+      - "."
+images:
+  - "australia-southeast1-docker.pkg.dev/$PROJECT_ID/olexi-ext/olexi-extension-host:$BUILD_ID"
+  - "australia-southeast1-docker.pkg.dev/$PROJECT_ID/olexi-ext/olexi-extension-host:latest"
