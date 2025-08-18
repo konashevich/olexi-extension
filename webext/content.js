@@ -152,9 +152,11 @@
         showLoadingIndicator();
         try {
             const apiKey = await getApiKey();
+            removeProcessingIndicator(); // clean up any stale processing banner
             await streamSession(userPrompt, apiKey);
         } catch (error) {
             removeLoadingIndicator();
+            removeProcessingIndicator();
             console.error('Olexi Error:', error);
             let msg = typeof error?.message === 'string' ? error.message : 'Something went wrong.';
             if (/AustLII is not accessible/i.test(msg)) msg = 'AustLII is not responding. Please try again later.';
@@ -209,17 +211,21 @@
                         if (event === 'progress') {
                             // Could update loading text here
                         } else if (event === 'results_preview') {
+                            // Show the initial preview, then immediately show a processing spinner while AI prepares the summary
                             removeLoadingIndicator();
                             const items = Array.isArray(payload.items) ? payload.items : [];
                             const md = renderResultsMarkdown(items);
                             displayMessage(md, 'ai');
+                            showProcessingIndicator();
                         } else if (event === 'answer') {
                             removeLoadingIndicator();
+                            removeProcessingIndicator();
                             shareUrl = payload.url || null;
                             const md = typeof payload.markdown === 'string' ? payload.markdown : 'No answer.';
                             displayMessage(md, 'ai', shareUrl);
                         } else if (event === 'error') {
                             removeLoadingIndicator();
+                            removeProcessingIndicator();
                             const msg = payload.detail || 'Error during research session.';
                             displayMessage(msg, 'ai');
                         }
@@ -296,6 +302,7 @@
                 if (!prompt) return;
                 displayMessage(prompt, 'user');
                 showLoadingIndicator();
+                removeProcessingIndicator();
                 const apiKey = await getApiKey();
                 await streamSession(prompt, apiKey);
             }
@@ -318,6 +325,22 @@
         if (el) el.remove();
     }
 
+    function showProcessingIndicator() {
+        // Avoid duplicates
+        removeProcessingIndicator();
+        const el = document.createElement('div');
+        el.id = 'olexi-processing';
+        el.classList.add('olexi-message', 'ai-message');
+        el.innerHTML = '<span class="olexi-spinner" aria-hidden="true"></span> Olexi AI is processing the search results. Please wait...';
+        messagesContainer.appendChild(el);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    function removeProcessingIndicator() {
+        const el = document.getElementById('olexi-processing');
+        if (el) el.remove();
+    }
+
     // --- Helpers ---
     function createIconButton(iconText, title) {
         const btn = document.createElement('button');
@@ -331,6 +354,8 @@
     function clearChat() {
         chatHistory.splice(0, chatHistory.length);
         messagesContainer.innerHTML = '';
+    removeLoadingIndicator();
+    removeProcessingIndicator();
         const welcomeMsg = document.querySelector('.olexi-welcome');
         if (welcomeMsg) welcomeMsg.style.display = '';
         updateToolbarState();

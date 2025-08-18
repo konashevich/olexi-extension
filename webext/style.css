@@ -237,6 +237,30 @@ body.olexi-collapsed {
     font-style: italic;
 }
 
+/* Processing indicator (after preview, before summary) */
+#olexi-processing {
+    background-color: #eef2ff !important;
+    border-left: 3px solid #6366f1 !important;
+    color: #3730a3;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.olexi-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(99,102,241,0.3);
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    display: inline-block;
+    animation: olexi-spin 0.8s linear infinite;
+}
+
+@keyframes olexi-spin {
+    to { transform: rotate(360deg); }
+}
+
 /* Per-message copy button */
 .olexi-msg-copy {
     position: absolute;
