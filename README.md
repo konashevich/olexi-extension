@@ -79,5 +79,10 @@ Notes on separation
 - Health timeouts: A warning is shown, but the session continues. Consider increasing `AUSTLII_TIMEOUT` or `AUSTLII_HEALTH_TIMEOUT` in the host.
 - Authorisation errors: Re‑enter the API key when prompted.
 
-## License and attribution
-- This extension is part of the Olexi AI project. AustLII content is subject to AustLII terms of use.
+## License
+
+Licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## Attribution
+
+AustLII content is subject to AustLII terms of use.
