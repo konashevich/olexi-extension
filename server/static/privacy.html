@@ -15,49 +15,49 @@
 </head>
 <body>
   <h1>Privacy Policy</h1>
-  <p><em>Effective: 14 August 2025</em></p>
+  <p><em>Effective: 18 August 2025</em></p>
 
+  <h2>Overview</h2>
   <p>
-    The OLEXI Extension does not collect or store your personal data, browsing history,
-    prompts, or research results. All interactions stay on your device unless you direct a
-    request to your configured Olexi Host service.
+    The Olexi AI Extension adds an assistant panel on supported legal websites. It does not
+    collect personal information, sell data, or use data for advertising or profiling.
   </p>
 
-  <h2>Data flow</h2>
+  <h2>Data processed to provide the service</h2>
+  <p>
+    When you submit a prompt in the extension, the prompt and minimal context necessary to perform
+    the request are sent to your configured Olexi Host service to generate search results and
+    summaries. The extension itself does not retain this data.
+  </p>
+
+  <h2>What we store locally</h2>
   <ul>
-    <li>The extension UI sends your prompt to an Olexi Host you control (default: <code>http://127.0.0.1:3000</code> or your deployed host).</li>
-    <li>The host may call third‑party services to fulfil the request:
-      <ul>
-        <li>Google Gemini (if configured) for planning/summarisation.</li>
-        <li>AustLII (<a href="https://www.austlii.edu.au/" target="_blank" rel="noopener">austlii.edu.au</a>) for legal search results.</li>
-      </ul>
-    </li>
+    <li>Your Olexi API key and minimal UI settings may be stored in <code>chrome.storage.local</code>.</li>
+    <li>This storage is local to your device and is not synced or shared.</li>
   </ul>
 
-  <h2>Third‑party services</h2>
+  <h2>What we do not collect</h2>
+  <ul>
+    <li>No analytics or telemetry from the extension.</li>
+    <li>No sale of data and no advertising use.</li>
+    <li>No collection of your browsing history by the extension.</li>
+  </ul>
+
+  <h2>Retention</h2>
   <p>
-    We do not control nor are we responsible for what is collected by third‑party services,
-    including Google Gemini and AustLII (austlii.edu.au). Their processing is subject to
-    their own terms and privacy policies.
+    The extension does not retain prompts or results. Your chosen Olexi Host may keep minimal
+    operational logs (for example, error or rate‑limit logs) depending on its configuration.
   </p>
 
-  <h2>Local storage</h2>
-  <p>
-    The extension may store your API key locally in <code>chrome.storage.local</code> or
-    <code>localStorage</code> for convenience. This information does not leave your device.
-  </p>
-
-  <h2>Telemetry and logging</h2>
-  <p>
-    The extension does not send analytics or telemetry. If you deploy the Olexi Host,
-    it may keep minimal operational logs for rate limiting and security; that configuration
-    is outside the extension and under your control.
-  </p>
+  <h2>Your choices</h2>
+  <ul>
+    <li>You can clear stored data by removing the extension’s data or uninstalling the extension.</li>
+    <li>You may configure or change the Olexi Host service you use.</li>
+  </ul>
 
   <h2>Contact</h2>
   <p>
-    For questions, please open an issue in the project’s GitHub repository or contact the
-    maintainer via the Chrome Web Store listing email.
+    For questions, please contact the maintainer via the Chrome Web Store listing or the project repository.
   </p>
 
   <hr>

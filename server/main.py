@@ -54,6 +54,19 @@ async def root():
     return {"status": "Olexi Extension Host running", "mcp": os.getenv("MCP_URL", "unset")}
 
 
+@app.get("/privacy", include_in_schema=False)
+async def privacy():
+    """Serve the public Privacy Policy.
+
+    This provides a stable URL like /privacy in addition to /static/privacy.html.
+    """
+    path = _STATIC_DIR / "privacy.html"
+    if path.exists():
+        return FileResponse(str(path), media_type="text/html")
+    # Fallback: friendly message if not yet included in image
+    raise HTTPException(status_code=404, detail="Privacy policy not found in this deployment")
+
+
 class ResearchRequest(BaseModel):
     prompt: str
     maxResults: int = 25
