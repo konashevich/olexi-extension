@@ -491,13 +491,21 @@
     while (i < src.length) {
             const ch = src[i];
             if (ch === '[' && !isEscaped(src, i)) {
-                const closeText = findNextUnescaped(src, ']', i + 1);
-                // allow optional whitespace before '('
-                if (closeText !== -1) {
+                // Find matching ']' allowing nested brackets in link text, respecting escapes
+                let p = i + 1;
+                let textDepth = 1;
+                while (p < src.length && textDepth > 0) {
+                    if (src[p] === '[' && !isEscaped(src, p)) textDepth++;
+                    else if (src[p] === ']' && !isEscaped(src, p)) textDepth--;
+                    p++;
+                }
+                if (textDepth === 0) {
+                    const closeText = p - 1;
+                    // allow optional whitespace before '('
                     let k = closeText + 1;
                     while (k < src.length && /\s/.test(src[k])) k++;
                     if (k < src.length && src[k] === '(' && !isEscaped(src, k)) {
-                        // find matching ')' with depth, respecting escapes
+                        // find matching ')' with depth, respecting escapes (support nested parentheses in URL)
                         let j = k + 1;
                         let depth = 1;
                         while (j < src.length && depth > 0) {
@@ -517,7 +525,7 @@
             }
             // Fallback: support non-standard (text)[url]
             if (ch === '(' && !isEscaped(src, i)) {
-                // find matching ')'
+                // find matching ')' with depth, to support nested parentheses in text
                 let j = i + 1;
                 let depth = 1;
                 while (j < src.length && depth > 0) {
@@ -529,8 +537,16 @@
                     const text = src.slice(i + 1, j - 1);
                     let k = j; while (k < src.length && /\s/.test(src[k])) k++;
                     if (k < src.length && src[k] === '[' && !isEscaped(src, k)) {
-                        const closeUrl = findNextUnescaped(src, ']', k + 1);
-                        if (closeUrl !== -1) {
+                        // find matching ']' with depth to support nested brackets in URL
+                        let q = k + 1;
+                        let bdepth = 1;
+                        while (q < src.length && bdepth > 0) {
+                            if (src[q] === '[' && !isEscaped(src, q)) bdepth++;
+                            else if (src[q] === ']' && !isEscaped(src, q)) bdepth--;
+                            q++;
+                        }
+                        if (bdepth === 0) {
+                            const closeUrl = q - 1;
                             const url = src.slice(k + 1, closeUrl);
                             out += `<a href="${escapeAttr(unescapeUrl(url))}" target="_blank">${escapeHtml(unescapeDisplay(text))}</a>`;
                             i = closeUrl + 1;
