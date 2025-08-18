@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Optional, Any
 import urllib.parse
 import os
+from pathlib import Path
 import json
 import asyncio
 
@@ -28,9 +29,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Optional static (for local splash/testing)
-os.makedirs("static", exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Optional static (for local splash/testing) within the server package directory
+_BASE_DIR = Path(__file__).resolve().parent
+_STATIC_DIR = _BASE_DIR / "static"
+_STATIC_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
 
 @app.get("/", include_in_schema=False)

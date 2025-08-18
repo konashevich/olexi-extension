@@ -16,15 +16,23 @@ from pathlib import Path
 # is launched from the repo root. Keep default load as fallback for any workspace-level .env.
 _DEFAULT_ENV_LOADED = False
 try:
-    _env_path = Path(__file__).resolve().parents[1] / ".env"
-    if _env_path.exists():
-        load_dotenv(dotenv_path=_env_path, override=False)
+    _base_dir = Path(__file__).resolve().parent
+    # Prefer server-local .env
+    _env_local = _base_dir / ".env"
+    if _env_local.exists():
+        load_dotenv(dotenv_path=_env_local, override=False)
         _DEFAULT_ENV_LOADED = True
+    else:
+        # Fallback: project folder one level up (historical layout)
+        _env_parent = _base_dir.parents[0] / ".env"
+        if _env_parent.exists():
+            load_dotenv(dotenv_path=_env_parent, override=False)
+            _DEFAULT_ENV_LOADED = True
 except Exception:
     pass
 
 if not _DEFAULT_ENV_LOADED:
-    # Fallback: try current working directory
+    # Last resort: current working directory
     try:
         load_dotenv()
     except Exception:

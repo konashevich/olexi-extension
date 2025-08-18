@@ -52,13 +52,18 @@ Extension settings:
 - The host mounts MCP under `/mcp` and manages sessions with progress reporting.
 
 ## Development
-- Load the extension (Developer Mode in Chromium‑based browsers) from `olexi-extension/`.
+- Load the extension (Developer Mode in Chromium‑based browsers) from `olexi-extension/webext/` only.
 - Start the extension host backend (FastAPI/uvicorn) that the content script talks to. It connects to the remote MCP by default.
   - App path: `olexi-extension/server/main:app`
   - Default MCP endpoint: `https://olexi-mcp-root-au-691931843514.australia-southeast1.run.app/`
   - Override with env: `MCP_URL=https://...` if needed
   - The content script posts to `http://127.0.0.1:3000/session/research` by default. You can change this at runtime by setting `window.OLEXI_HOST_URL` before the script runs.
 - Ensure required Python dependencies are installed (see project `requirements.txt`).
+
+Project layout (single extension build)
+- `olexi-extension/webext/` — Chrome extension code (manifest, content.js, styles, assets)
+- `olexi-extension/server/` — Host backend (FastAPI) for planning/summarization and MCP calls
+- `olexi-extension/` — Docs only (README, PRIVACY, plans)
 
 Notes on separation
 - The MCP server now runs remotely (Cloud Run) and only exposes tools. The local host server plans and summarises and calls the MCP over Streamable HTTP.

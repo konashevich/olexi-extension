@@ -377,12 +377,13 @@
                 .msg { padding: 10px 12px; border-radius: 10px; margin: 10px 0; white-space: pre-wrap; }
                 .user { background: #1D4ED8; color: white; }
                 .ai { background: #f1f5f9; color: #0f172a; border-left: 3px solid #3B82F6; }
+                a { color: #1D4ED8; text-decoration: underline; }
                 @media print { .meta a { color: inherit; text-decoration: none; } }
             </style>`;
         const html = `<!doctype html><html><head><meta charset="utf-8">${style}</head><body>
             <h1>Olexi Chat Export</h1>
             <div class="meta">Exported: ${new Date().toLocaleString()}<br>Page: <a href="${location.href}">${location.href}</a></div>
-            ${history.map(m => `<div class="msg ${m.role === 'user' ? 'user' : 'ai'}">${escapeHtml(m.content).replace(/\n/g,'<br>')}</div>`).join('')}
+            ${history.map(m => `<div class="msg ${m.role === 'user' ? 'user' : 'ai'}">${mdToHtml(m.content)}</div>`).join('')}
         </body></html>`;
         w.document.open();
         w.document.write(html);
@@ -398,6 +399,33 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
+    }
+
+    function escapeAttr(s) {
+        return String(s).replace(/"/g, '&quot;');
+    }
+
+    // Convert minimal Markdown (links + line breaks) to safe HTML for PDF export
+    function mdToHtml(md) {
+        if (!md) return '';
+        // Unescape common backslash escapes so titles render cleanly
+        const unescaped = String(md).replace(/\\([()\[\]])/g, '$1');
+        const parts = [];
+        let last = 0;
+        const re = /\[([^\]]+)\]\(([^)]+)\)/g;
+        let m;
+        while ((m = re.exec(unescaped)) !== null) {
+            const [full, text, url] = m;
+            if (m.index > last) {
+                parts.push(escapeHtml(unescaped.slice(last, m.index)).replace(/\n/g, '<br>'));
+            }
+            parts.push(`<a href="${escapeAttr(url)}" target="_blank">${escapeHtml(text)}</a>`);
+            last = m.index + full.length;
+        }
+        if (last < unescaped.length) {
+            parts.push(escapeHtml(unescaped.slice(last)).replace(/\n/g, '<br>'));
+        }
+        return parts.join('');
     }
 
     function flashToolbar(btn) {
