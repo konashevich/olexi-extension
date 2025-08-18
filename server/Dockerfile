@@ -22,8 +22,8 @@ RUN python -m venv .venv && . .venv/bin/activate && \
     pip install --upgrade pip && \
     pip install -r requirements.txt
 
-# Copy only the extension package
-COPY olexi-extension /app/olexi-extension
+# Copy the current project (olexi-extension is now the root)
+COPY . /app/olexi-extension
 
 # Ensure no local .env is baked into the image
 RUN rm -f /app/olexi-extension/server/.env || true

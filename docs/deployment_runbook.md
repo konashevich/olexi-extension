@@ -13,16 +13,18 @@ Service summary
   - olexi-host-google-api-key (HOST_GOOGLE_API_KEY)
 
 ## Source layout
-- Extension & Host root: `olexi-extension/`
+- Extension & Host root: `olexi-extension/` (project root directory)
 - Server code: `olexi-extension/server/`
   - `main.py` — FastAPI app (ASGI)
   - `host_agent.py` — GenAI planner/summarizer (uses HOST_GOOGLE_API_KEY)
   - `database_map.py` — Local database list
-  - `Dockerfile` — Runtime image for server
+  - `Dockerfile` — Runtime image for server (updated for current project structure)
 - Extension (Chrome) code: `olexi-extension/webext/`
   - `manifest.json`, `content.js`, `style.css`, icons, popup
 - Build config: `olexi-extension/cloudbuild.yaml`
 - Upload control: `olexi-extension/.gcloudignore`
+
+**Note**: Project structure was updated where `olexi-extension` is now the root directory (previously was under `austlii-mcp-server/olexi-extension`). Dockerfile has been updated accordingly to use `COPY . /app/olexi-extension` for the new structure.
 
 ## Environment configuration
 - Env vars
@@ -55,6 +57,7 @@ Service summary
 ## Operations
 - Logs: Cloud Run logs in Cloud Logging (service: olexi-extension-host)
 - Metrics: Cloud Monitoring (Requests, Latency, Errors)
+- Current revision: `olexi-extension-host-00003-g6d` (deployed 2025-08-18)
 - Common updates:
   - Rebuild image via Cloud Build
   - Deploy new revision via `gcloud run deploy`
@@ -106,8 +109,13 @@ Service summary
 - Configure monitoring dashboards and alerting
 
 ## Appendix: Useful commands (reference)
-- Rebuild & push via Cloud Build (uses cloudbuild file)
+- Rebuild & push via Cloud Build (uses cloudbuild file): `gcloud builds submit --config cloudbuild.yaml`
 - Update env vars: redeploy with `--set-env-vars`
 - Update secret version: add version; service will use `latest` if configured
+- Quick deployment check: `curl -s https://olexi-extension-host-655512577217.australia-southeast1.run.app/`
+
+## Recent Changes
+- **2025-08-18**: Fixed Dockerfile for new project structure where `olexi-extension` is root directory
+- **2025-08-18**: Deployed revision `olexi-extension-host-00003-g6d` with corrected build context
 
 Last updated: 2025-08-18
