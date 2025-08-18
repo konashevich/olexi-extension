@@ -242,7 +242,7 @@
         const top = results.slice(0, 10);
         const items = top.map((r, i) => `- [${escapeMd(r.title || 'Untitled')}](${r.url})${r.metadata ? ` — ${escapeMd(r.metadata)}` : ''}`);
         const extra = results.length > 10 ? `\n\n…and ${results.length - 10} more.` : '';
-        return `Top results:\n\n${items.join('\n')}${extra}`;
+        return `Top Search Results:\n\n${items.join('\n')}${extra}`;
     }
 
     function escapeMd(s) {
