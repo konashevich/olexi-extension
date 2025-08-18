@@ -164,14 +164,49 @@
         }
     });
 
+    // Resolve host base URL (supports window.OLEXI_HOST_URL, local dev, then Cloud Run)
+    let _resolvedHostBase = null;
+    let _resolvingHostBase = null;
+    async function resolveHostBase() {
+        if (_resolvedHostBase) return _resolvedHostBase;
+        if (_resolvingHostBase) return _resolvingHostBase;
+        const candidates = [];
+        if (typeof window !== 'undefined' && window.OLEXI_HOST_URL) candidates.push(String(window.OLEXI_HOST_URL).replace(/\/$/, ''));
+        candidates.push('http://127.0.0.1:3000');
+        candidates.push('http://localhost:3000');
+        candidates.push('https://olexi-extension-host-655512577217.australia-southeast1.run.app');
+        _resolvingHostBase = (async () => {
+            for (const base of candidates) {
+                try {
+                    const controller = new AbortController();
+                    const t = setTimeout(() => controller.abort(), 2500);
+                    const ping = await fetch(base + '/', {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json,*/*' },
+                        mode: 'cors',
+                        credentials: 'omit',
+                        cache: 'no-store',
+                        signal: controller.signal,
+                    });
+                    clearTimeout(t);
+                    if (ping.ok) { _resolvedHostBase = base; return base; }
+                } catch (_) { /* try next */ }
+            }
+            throw new Error('Olexi host is unreachable. If running locally, start the host or set window.OLEXI_HOST_URL.');
+        })();
+        try { return await _resolvingHostBase; } finally { _resolvingHostBase = null; }
+    }
+
     // --- Streaming SSE over POST to /session/research ---
     async function streamSession(prompt, apiKey) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 120000);
         let shareUrl = null;
         try {
-            const base = (window.OLEXI_HOST_URL || 'https://olexi-extension-host-655512577217.australia-southeast1.run.app');
-            const res = await fetch(base + '/session/research', {
+            const base = await resolveHostBase();
+            let res;
+            try {
+                res = await fetch(base + '/session/research', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -179,13 +214,23 @@
                     'X-API-Key': apiKey,
                     'X-Extension-Id': 'olexi-local'
                 },
+                mode: 'cors',
+                credentials: 'omit',
                 body: JSON.stringify({ prompt }),
                 signal: controller.signal,
-            });
+                });
+            } catch (netErr) {
+                const msg = (netErr && netErr.message) ? netErr.message : String(netErr);
+                throw new Error(`Network error contacting Olexi host at ${base}: ${msg}`);
+            }
             if (!res.ok || !res.body) {
                 let detail = '';
                 try { detail = await res.text(); } catch {}
                 throw new Error(detail || res.statusText || `HTTP ${res.status}`);
+            }
+            const ctype = (res.headers && res.headers.get && res.headers.get('content-type')) || '';
+            if (!/text\/event-stream/i.test(ctype)) {
+                throw new Error(`Unexpected response content-type: ${ctype || 'unknown'}`);
             }
             const reader = res.body.getReader();
             const decoder = new TextDecoder('utf-8');
