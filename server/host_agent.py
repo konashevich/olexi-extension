@@ -143,7 +143,7 @@ class HostAI:
         if not self.available or self.client is None:
             raise RuntimeError("Host AI unavailable")
         sys_prompt = (
-            "You are Olexi, a neutral legal research assistant. Summarise ONLY based on the provided results. "
+            "You are Olexi AI, a neutral legal research assistant. Summarise ONLY based on the provided results. "
             "Use British English. Return concise Markdown with sections: \n\n"
             "## Summary (≤120 words)\n\n"
             "## Key Cases (bulleted: [Title](URL) — court/year if available)\n\n"

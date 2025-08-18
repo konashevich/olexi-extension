@@ -308,7 +308,7 @@
         const el = document.createElement('div');
         el.id = 'olexi-loading';
         el.classList.add('olexi-message', 'ai-message');
-        el.innerHTML = '\ud83d\udd0d Searching Australian legal databases...<br><small>This may take 30-60 seconds for comprehensive results</small>';
+        el.innerHTML = '\ud83d\udd0d Olexi AI is searching Australian legal databases...<br><small>This may take 30-60 seconds</small>';
         messagesContainer.appendChild(el);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
