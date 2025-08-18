@@ -10,8 +10,25 @@ import os
 import json
 from typing import Dict, List, Any, Optional
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+# Load .env from the extension package root to ensure keys are found when server
+# is launched from the repo root. Keep default load as fallback for any workspace-level .env.
+_DEFAULT_ENV_LOADED = False
+try:
+    _env_path = Path(__file__).resolve().parents[1] / ".env"
+    if _env_path.exists():
+        load_dotenv(dotenv_path=_env_path, override=False)
+        _DEFAULT_ENV_LOADED = True
+except Exception:
+    pass
+
+if not _DEFAULT_ENV_LOADED:
+    # Fallback: try current working directory
+    try:
+        load_dotenv()
+    except Exception:
+        pass
 
 try:
     from google import genai
@@ -60,10 +77,45 @@ class HostAI:
         if types is not None:
             kwargs["config"] = types.GenerateContentConfig(response_mime_type="application/json")
         resp = self.client.models.generate_content(**kwargs)
+
+        # Robust JSON extraction: handle code fences or extra text around JSON
+        raw_text = (getattr(resp, "text", None) or "").strip()
+        def _strip_code_fences(s: str) -> str:
+            if s.startswith("```"):
+                # remove first fence line
+                parts = s.splitlines()
+                # drop opening fence
+                parts = parts[1:]
+                # drop closing fence if present
+                try:
+                    end = parts.index("```")
+                    parts = parts[:end]
+                except ValueError:
+                    pass
+                return "\n".join(parts).strip()
+            return s
+
+        def _extract_json(s: str) -> str:
+            import re as _re
+            s2 = _strip_code_fences(s)
+            # Find the first JSON object in the text
+            m = _re.search(r"\{[\s\S]*\}", s2)
+            return m.group(0) if m else s2
+
+        text_for_json = _extract_json(raw_text)
         try:
-            data = json.loads(resp.text or "{}")
+            data = json.loads(text_for_json or "{}")
         except Exception as e:
-            raise RuntimeError(f"Invalid planner output: {e}")
+            # Final attempt: locate outermost braces naively
+            try:
+                first = text_for_json.find("{")
+                last = text_for_json.rfind("}")
+                if first >= 0 and last > first:
+                    data = json.loads(text_for_json[first:last+1])
+                else:
+                    raise e
+            except Exception as e2:
+                raise RuntimeError(f"Invalid planner output: {e2}")
         if not isinstance(data, dict) or "query" not in data or "databases" not in data:
             raise RuntimeError("Planner did not return required keys")
         if not isinstance(data["databases"], list):

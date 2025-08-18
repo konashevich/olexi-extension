@@ -3,9 +3,6 @@
 (function() {
     if (document.getElementById('olexi-chat-container')) return; // run once
 
-    // --- Chat state ---
-    const chatHistory = []; // { role: 'user'|'ai', content: string, ts: number }
-
     // --- Authorization (host-side only) ---
     async function getApiKey() {
         return await new Promise((resolve, reject) => {
@@ -44,7 +41,6 @@
                     <div class="subtitle">Legal Research Assistant (MCP Host)</div>
                 </div>
             </div>
-            <div id="olexi-toolbar" aria-label="Chat actions toolbar"></div>
         </div>
         <div class="olexi-welcome">
             <h3>Welcome to Olexi</h3>
@@ -70,50 +66,7 @@
     const inputForm = document.getElementById('olexi-input-form');
     const inputField = document.getElementById('olexi-input');
     const toggleBtn = document.getElementById('olexi-toggle-btn');
-    const toolbar = document.getElementById('olexi-toolbar');
     // No database filter in primary UX
-
-    // Build toolbar buttons (icon-only)
-    const btnNew = createIconButton('🗘', 'Start a new chat');
-    const btnCopyAll = createIconButton('📋', 'Copy entire chat');
-    const btnSaveJson = createIconButton('💾', 'Save chat as JSON');
-    const btnSavePdf = createIconButton('📄', 'Save chat as PDF');
-    btnNew.id = 'olexi-btn-new-chat';
-    btnCopyAll.id = 'olexi-btn-copy-all';
-    btnSaveJson.id = 'olexi-btn-save-json';
-    btnSavePdf.id = 'olexi-btn-save-pdf';
-    toolbar.appendChild(btnNew);
-    toolbar.appendChild(btnCopyAll);
-    toolbar.appendChild(btnSaveJson);
-    toolbar.appendChild(btnSavePdf);
-
-    btnNew.addEventListener('click', () => {
-        if (!confirm('Start a new chat? This will clear the current conversation.')) return;
-        clearChat();
-    });
-    btnCopyAll.addEventListener('click', async () => {
-        if (chatHistory.length === 0) return;
-        const text = chatHistory.map(m => `${m.role === 'user' ? 'User' : 'Olexi'}: ${m.content}`).join('\n\n');
-        await copyToClipboard(text);
-        flashToolbar(btnCopyAll);
-    });
-    btnSaveJson.addEventListener('click', () => {
-        if (chatHistory.length === 0) return;
-        const payload = {
-            meta: { exportedAt: new Date().toISOString(), page: location.href, title: document.title },
-            messages: chatHistory,
-        };
-        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-        const fname = `olexi_chat_${new Date().toISOString().replace(/[:.]/g,'-')}.json`;
-        triggerDownload(blob, fname);
-        flashToolbar(btnSaveJson);
-    });
-    btnSavePdf.addEventListener('click', () => {
-        if (chatHistory.length === 0) return;
-        exportChatPdf(chatHistory);
-        flashToolbar(btnSavePdf);
-    });
-    updateToolbarState();
 
     // Toggle
     let isCollapsed = false;
@@ -151,7 +104,7 @@
         event.preventDefault();
         const userPrompt = inputField.value.trim();
         if (!userPrompt) return;
-    displayMessage(userPrompt, 'user');
+        displayMessage(userPrompt, 'user');
         inputField.value = ''; inputField.style.height = 'auto';
         showLoadingIndicator();
         try {
@@ -255,8 +208,6 @@
     function displayMessage(text, sender, searchUrl = null) {
         const welcomeMsg = document.querySelector('.olexi-welcome');
         if (welcomeMsg && sender === 'user') welcomeMsg.style.display = 'none';
-        // Persist to chat history
-        chatHistory.push({ role: sender === 'user' ? 'user' : 'ai', content: text, ts: Date.now() });
         const el = document.createElement('div');
         el.classList.add('olexi-message', `${sender}-message`);
         let htmlText = text.replace(/\n/g, '<br>');
@@ -271,22 +222,8 @@
             link.style.textDecoration = 'none'; link.style.color = '#1e293b'; link.style.fontSize = '13px';
             el.appendChild(link);
         }
-        // Per-message copy button (icon-only)
-        const copyBtn = document.createElement('button');
-        copyBtn.className = 'olexi-msg-copy';
-        copyBtn.type = 'button';
-        copyBtn.title = 'Copy response';
-        copyBtn.textContent = '📋';
-        copyBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            await copyToClipboard(text);
-            copyBtn.classList.add('copied');
-            setTimeout(() => copyBtn.classList.remove('copied'), 600);
-        });
-        el.appendChild(copyBtn);
         messagesContainer.appendChild(el);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        updateToolbarState();
     }
 
     // Delegate clicks on special olexi://ask links to trigger a new session with the link text as the prompt
@@ -321,92 +258,5 @@
     function removeLoadingIndicator() {
         const el = document.getElementById('olexi-loading');
         if (el) el.remove();
-    }
-
-    // --- Helpers ---
-    function createIconButton(iconText, title) {
-        const btn = document.createElement('button');
-        btn.className = 'olexi-icon-btn';
-        btn.type = 'button';
-        btn.title = title;
-        btn.textContent = iconText;
-        return btn;
-    }
-
-    function clearChat() {
-        chatHistory.splice(0, chatHistory.length);
-        messagesContainer.innerHTML = '';
-        const welcomeMsg = document.querySelector('.olexi-welcome');
-        if (welcomeMsg) welcomeMsg.style.display = '';
-        updateToolbarState();
-    }
-
-    async function copyToClipboard(text) {
-        try {
-            await navigator.clipboard.writeText(text);
-        } catch (err) {
-            // Fallback: create a temporary textarea
-            const ta = document.createElement('textarea');
-            ta.value = text;
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand('copy');
-            ta.remove();
-        }
-    }
-
-    function triggerDownload(blob, filename) {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-    }
-
-    function exportChatPdf(history) {
-        const w = window.open('', '_blank');
-        if (!w) { alert('Popup blocked. Please allow popups to save PDF.'); return; }
-        const style = `
-            <style>
-                body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; padding: 24px; }
-                h1 { font-size: 18px; margin: 0 0 16px; }
-                .meta { color: #475569; font-size: 12px; margin-bottom: 16px; }
-                .msg { padding: 10px 12px; border-radius: 10px; margin: 10px 0; white-space: pre-wrap; }
-                .user { background: #1D4ED8; color: white; }
-                .ai { background: #f1f5f9; color: #0f172a; border-left: 3px solid #3B82F6; }
-                @media print { .meta a { color: inherit; text-decoration: none; } }
-            </style>`;
-        const html = `<!doctype html><html><head><meta charset="utf-8">${style}</head><body>
-            <h1>Olexi Chat Export</h1>
-            <div class="meta">Exported: ${new Date().toLocaleString()}<br>Page: <a href="${location.href}">${location.href}</a></div>
-            ${history.map(m => `<div class="msg ${m.role === 'user' ? 'user' : 'ai'}">${escapeHtml(m.content).replace(/\n/g,'<br>')}</div>`).join('')}
-        </body></html>`;
-        w.document.open();
-        w.document.write(html);
-        w.document.close();
-        // Wait a tick to ensure content renders, then print (user can choose Save as PDF)
-        w.onload = () => w.print();
-    }
-
-    function escapeHtml(s) {
-        return String(s)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
-
-    function flashToolbar(btn) {
-        btn.classList.add('olexi-flash');
-        setTimeout(() => btn.classList.remove('olexi-flash'), 300);
-    }
-
-    function updateToolbarState() {
-        const disabled = chatHistory.length === 0;
-        [btnCopyAll, btnSaveJson, btnSavePdf].forEach(b => b.disabled = disabled);
     }
 })();

@@ -24,3 +24,6 @@ npm-debug.log*
 .env.test.local
 .env.production.local
 extension_api_keys.txt
+
+# Custom
+quickguide.md

@@ -64,7 +64,7 @@ async def session_research(req: ResearchRequest):
     async def event_stream():
         # Plan
         yield f"event: progress\ndata: {json.dumps({'stage':'planning','message':'Planning search'})}\n\n"
-        from database_map import DATABASE_TOOLS_LIST  # import lazily to avoid heavy import on module load
+        from .database_map import DATABASE_TOOLS_LIST  # local copy to keep host independent
         try:
             plan = HOST_AI.plan_search(req.prompt, DATABASE_TOOLS_LIST, max_dbs=max(req.maxDatabases, 1))
         except Exception as e:
