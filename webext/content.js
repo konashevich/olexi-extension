@@ -47,13 +47,12 @@
             <div id="olexi-toolbar" aria-label="Chat actions toolbar"></div>
         </div>
         <div class="olexi-welcome">
-            <h3>Welcome to Olexi</h3>
-            <p>Enter a legal research prompt. Olexi will search AustLII using MCP tools. No server-side AI is used.</p>
-            <p><small>Tip: Press Ctrl+Enter to send.</small></p>
+            <h3>Welcome to Olexi AI Extension</h3>
+            <p>Use Olexi to search the AustLII database by entering your legal query.</p>            
         </div>
         <div id="olexi-messages"></div>
         <form id="olexi-input-form">
-            <textarea id="olexi-input" placeholder="e.g., Recent HCA cases on unconscionable conduct" title="Press Ctrl+Enter to send" rows="2"></textarea>
+            <textarea id="olexi-input" placeholder="e.g., Recent HCA cases on unconscionable conduct [Press Ctrl+Enter shortcut to Search]" title="Press Ctrl+Enter to send" rows="2"></textarea>
             <button id="olexi-send-btn" type="submit">Search</button>
         </form>
     `;
