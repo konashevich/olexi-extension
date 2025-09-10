@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -17,8 +17,22 @@ from mcp.client.streamable_http import streamablehttp_client
 # Host-side AI (planning & summarization)
 from .host_agent import HOST_AI
 
+# Rate limiting
+from .rate_limiter import rate_limiter
 
-app = FastAPI(title="Olexi Extension Host", version="1.0.0", description="Serves the extension UI and hosts research sessions via remote MCP")
+# Session token management
+from .session_tokens import session_token_manager
+
+# Security utilities
+from .security import (
+    validate_chrome_extension_request, 
+    validate_fingerprint_format, 
+    get_client_ip, 
+    is_suspicious_request
+)
+
+
+app = FastAPI(title="Olexi Extension Host", version="1.1.0", description="Serves the extension UI and hosts research sessions via remote MCP")
 
 # CORS for content scripts (configurable)
 _allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "*")
@@ -75,6 +89,10 @@ class ResearchRequest(BaseModel):
     yearTo: Optional[int] = None
 
 
+class TokenRequest(BaseModel):
+    fingerprint: str
+
+
 def _build_austlii_url(query: str, dbs: List[str]) -> str:
     params = [("query", query), ("method", "boolean"), ("meta", "/au")]
     for code in dbs:
@@ -82,8 +100,63 @@ def _build_austlii_url(query: str, dbs: List[str]) -> str:
     return f"https://www.austlii.edu.au/cgi-bin/sinosrch.cgi?{urllib.parse.urlencode(params)}"
 
 
+@app.post("/session/token")
+async def generate_session_token(req: TokenRequest, request: Request):
+    """Generate a temporary session token for an extension installation"""
+    # Security checks
+    if not validate_chrome_extension_request(request):
+        raise HTTPException(status_code=403, detail="Invalid request source")
+    
+    if not validate_fingerprint_format(req.fingerprint):
+        raise HTTPException(status_code=400, detail="Invalid fingerprint format")
+    
+    # Check for suspicious patterns
+    if is_suspicious_request(request, req.fingerprint):
+        client_ip = get_client_ip(request)
+        print(f"Suspicious token request from IP {client_ip}, fingerprint {req.fingerprint}")
+        raise HTTPException(status_code=403, detail="Request blocked")
+    
+    # Generate session token
+    try:
+        token = await session_token_manager.generate_token(req.fingerprint)
+        return {
+            "token": token,
+            "expires_in_hours": int(os.getenv("TOKEN_LIFETIME_HOURS", "24")),
+            "message": "Token generated successfully"
+        }
+    except Exception as e:
+        print(f"Error generating token: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate token")
+
+
 @app.post("/session/research")
-async def session_research(req: ResearchRequest):
+async def session_research(req: ResearchRequest, request: Request):
+    # Security checks
+    # 1. Validate Chrome extension request
+    if not validate_chrome_extension_request(request):
+        raise HTTPException(status_code=403, detail="Invalid request source")
+    
+    # 2. Get and validate extension fingerprint
+    fingerprint = request.headers.get("x-extension-fingerprint")
+    if not fingerprint or not validate_fingerprint_format(fingerprint):
+        raise HTTPException(status_code=403, detail="Invalid extension fingerprint")
+    
+    # 3. Validate session token
+    session_token = request.headers.get("x-session-token")
+    if not session_token:
+        raise HTTPException(status_code=401, detail="Missing session token. Please request a new token.")
+    
+    if not await session_token_manager.validate_token(session_token, fingerprint):
+        raise HTTPException(status_code=401, detail="Invalid or expired session token. Please request a new token.")
+    
+    # 4. Check for suspicious patterns
+    if is_suspicious_request(request, fingerprint):
+        client_ip = get_client_ip(request)
+        print(f"Suspicious request detected from IP {client_ip}, fingerprint {fingerprint}")
+        raise HTTPException(status_code=403, detail="Request blocked")
+    
+    # 5. Rate limiting check (still useful as backup protection)
+    await rate_limiter.check_and_increment(fingerprint)
     if not getattr(HOST_AI, "available", False):
         raise HTTPException(status_code=503, detail="Host AI unavailable; set HOST_GOOGLE_API_KEY or GOOGLE_API_KEY")
 
@@ -251,4 +324,75 @@ async def session_research(req: ResearchRequest):
         yield f"event: answer\ndata: {json.dumps({'markdown': markdown, 'url': share_url or _build_austlii_url(query, dbs)})}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@app.get("/usage/{fingerprint}")
+async def get_usage_stats(fingerprint: str, request: Request):
+    """Get current usage statistics for a fingerprint"""
+    # Basic security check
+    if not validate_chrome_extension_request(request):
+        raise HTTPException(status_code=403, detail="Invalid request source")
+    
+    if not validate_fingerprint_format(fingerprint):
+        raise HTTPException(status_code=400, detail="Invalid fingerprint format")
+    
+    stats = rate_limiter.get_usage_stats(fingerprint)
+    return stats
+
+
+@app.get("/session/token/info")
+async def get_token_info(request: Request):
+    """Get information about the current session token"""
+    if not validate_chrome_extension_request(request):
+        raise HTTPException(status_code=403, detail="Invalid request source")
+    
+    session_token = request.headers.get("x-session-token")
+    if not session_token:
+        raise HTTPException(status_code=400, detail="Missing session token")
+    
+    token_info = await session_token_manager.get_token_info(session_token)
+    if not token_info:
+        raise HTTPException(status_code=404, detail="Token not found or expired")
+    
+    # Remove sensitive fingerprint from response
+    response_info = token_info.copy()
+    response_info["fingerprint"] = "***"  # Hide for privacy
+    
+    return response_info
+
+
+@app.post("/session/token/revoke")
+async def revoke_session_token(request: Request):
+    """Revoke the current session token"""
+    if not validate_chrome_extension_request(request):
+        raise HTTPException(status_code=403, detail="Invalid request source")
+    
+    session_token = request.headers.get("x-session-token")
+    if not session_token:
+        raise HTTPException(status_code=400, detail="Missing session token")
+    
+    revoked = await session_token_manager.revoke_token(session_token)
+    if not revoked:
+        raise HTTPException(status_code=404, detail="Token not found")
+    
+    return {"message": "Token revoked successfully"}
+
+
+@app.get("/admin/stats")
+async def get_admin_stats(request: Request):
+    """Get system statistics (admin only)"""
+    # Simple admin check - in production, you might want proper admin auth
+    admin_key = request.headers.get("x-admin-key")
+    if admin_key != os.getenv("ADMIN_KEY"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    token_stats = session_token_manager.get_stats()
+    return {
+        "session_tokens": token_stats,
+        "rate_limiter": {
+            "active_fingerprints": len(rate_limiter.daily_counts),
+            "requests_per_day_limit": rate_limiter.requests_per_day,
+            "requests_per_hour_limit": rate_limiter.requests_per_hour
+        }
+    }
 

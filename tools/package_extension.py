@@ -48,12 +48,22 @@ def main() -> int:
             print(f"Release manifest missing required key: {key}", file=sys.stderr)
             return 2
 
-    # Write a temporary manifest.json
+    # Write a temporary manifest.json and optionally inject client token
     tmp_manifest = None
+    tmp_content_js = None
+    content_js_path = WEBEXT / "content.js"
     try:
         tmp_manifest = base_manifest.read_text("utf-8") if base_manifest.exists() else None
         with base_manifest.open("w", encoding="utf-8") as f:
             json.dump(rel, f, indent=2)
+
+        # Optional token injection for auth
+        client_token = os.getenv("CLIENT_TOKEN")
+        if client_token and content_js_path.exists():
+            original = content_js_path.read_text("utf-8")
+            tmp_content_js = original
+            replaced = original.replace("__CLIENT_TOKEN__", client_token)
+            content_js_path.write_text(replaced, encoding="utf-8")
 
         OUTDIR.mkdir(parents=True, exist_ok=True)
 
@@ -82,6 +92,9 @@ def main() -> int:
         else:
             # Best effort: if we created manifest.json, remove it (unlikely since it existed)
             pass
+        # Restore original content.js if modified
+        if tmp_content_js is not None:
+            content_js_path.write_text(tmp_content_js, encoding="utf-8")
 
 
 if __name__ == "__main__":

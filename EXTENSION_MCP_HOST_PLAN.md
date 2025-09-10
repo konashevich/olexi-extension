@@ -6,7 +6,7 @@ This document defines the correct, VS Code–like MCP host design for the Olexi 
 - UX parity with VS Code MCP hosts: user asks in natural language; the host agent plans, invokes MCP tools, and returns grounded answers with citations.
 - Isolation: MCP server provides tools only (no AI). Host agent (extension backend) uses its own AI key(s) for planning/summarization.
 - Reliability: handle ambiguity, timeouts, quotas, and upstream health gracefully. Stream progress to the UI.
-- Security: API keys, extension-origin checks, daily per-key limits, and IP anti-sharing remain enforced on REST bridge.
+- Security: Prefer server-held credentials (no client API keys). Use origin checks and rate limits at the host if needed.
 
 ## 2) Architecture overview
 - Frontend (content script on AustLII)
@@ -73,7 +73,7 @@ This document defines the correct, VS Code–like MCP host design for the Olexi 
 
 ## 7) Security and isolation
 - Separate keys: HOST_GOOGLE_API_KEY (host agent) distinct from extension REST keys. MCP server never uses AI keys.
-- Continue enforcing: X-API-Key, X-Extension-Id, UA/origin checks, daily per-key rate limits, and IP anti-sharing.
+- Continue enforcing: X-Extension-Id (optional), UA/origin checks, and rate limits as appropriate.
 - Logging: rotate security events and summarize usage metrics (counts/latencies) without PII.
 
 ## 8) Implementation phases

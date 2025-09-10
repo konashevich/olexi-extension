@@ -3,9 +3,7 @@
   "name": "Olexi AI for AustLII",
   "version": "1.0",
   "description": "An AI-powered legal research assistant for the AustLII website.",
-  "permissions": [
-    "storage"
-  ],
+  "permissions": [],
   "host_permissions": [
     "*://*.austlii.edu.au/*",
   "http://127.0.0.1:3000/*",

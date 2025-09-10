@@ -6,32 +6,110 @@
     // --- Chat state ---
     const chatHistory = []; // { role: 'user'|'ai', content: string, ts: number }
 
-    // --- Authorization (host-side only) ---
-    async function getApiKey() {
-        return await new Promise((resolve, reject) => {
-            try {
-                chrome.storage?.local.get(['olexi_api_key'], (items) => {
-                    const existing = items?.olexi_api_key;
-                    if (existing && typeof existing === 'string' && existing.trim()) return resolve(existing.trim());
-                    const entered = window.prompt('Enter your Olexi API key to authorize the extension:');
-                    if (!entered || !entered.trim()) return reject(new Error('Missing API key'));
-                    const key = entered.trim();
-                    try { chrome.storage?.local.set({ olexi_api_key: key }, () => resolve(key)); } catch { resolve(key); }
-                });
-            } catch (e) {
-                try {
-                    let key = localStorage.getItem('olexi_api_key');
-                    if (!key) {
-                        const entered = window.prompt('Enter your Olexi API key to authorize the extension:');
-                        if (!entered || !entered.trim()) return reject(new Error('Missing API key'));
-                        key = entered.trim();
-                        localStorage.setItem('olexi_api_key', key);
-                    }
-                    resolve(key);
-                } catch (err) { reject(err); }
-            }
-        });
+    // Generate unique installation fingerprint
+    let installationFingerprint = null;
+    let sessionToken = null;
+    
+    async function generateInstallationFingerprint() {
+        if (installationFingerprint) return installationFingerprint;
+        
+        try {
+            // Create a canvas fingerprint
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.textBaseline = 'top';
+            ctx.font = '14px Arial';
+            ctx.fillText('Olexi Extension Fingerprint', 2, 2);
+            
+            const fingerprint = {
+                canvasFingerprint: canvas.toDataURL(),
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                language: navigator.language,
+                platform: navigator.platform,
+                screen: `${screen.width}x${screen.height}`,
+                userAgent: navigator.userAgent.substring(0, 100), // Truncate for consistency
+                extensionOrigin: window.location.origin
+            };
+            
+            // Create a hash of these values
+            const encoder = new TextEncoder();
+            const data = encoder.encode(JSON.stringify(fingerprint));
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            installationFingerprint = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 32);
+            
+            return installationFingerprint;
+        } catch (error) {
+            console.warn('Failed to generate fingerprint:', error);
+            // Fallback to a simpler fingerprint
+            installationFingerprint = btoa(navigator.userAgent + screen.width + screen.height).substring(0, 32);
+            return installationFingerprint;
+        }
     }
+
+    async function getOrCreateSessionToken() {
+        if (sessionToken) return sessionToken;
+        
+        // Try to get existing token from localStorage
+        const storedToken = localStorage.getItem('olexi-session-token');
+        if (storedToken) {
+            // Validate stored token
+            try {
+                const base = await resolveHostBase();
+                const fingerprint = await generateInstallationFingerprint();
+                
+                const response = await fetch(base + '/session/token/info', {
+                    method: 'GET',
+                    headers: {
+                        'X-Session-Token': storedToken,
+                        'X-Extension-Fingerprint': fingerprint
+                    },
+                    mode: 'cors',
+                    credentials: 'omit'
+                });
+                
+                if (response.ok) {
+                    sessionToken = storedToken;
+                    return sessionToken;
+                }
+            } catch (error) {
+                console.warn('Stored token validation failed:', error);
+            }
+        }
+        
+        // Generate new token
+        try {
+            const base = await resolveHostBase();
+            const fingerprint = await generateInstallationFingerprint();
+            
+            const response = await fetch(base + '/session/token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                mode: 'cors',
+                credentials: 'omit',
+                body: JSON.stringify({ fingerprint })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to get session token: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            sessionToken = data.token;
+            
+            // Store token in localStorage
+            localStorage.setItem('olexi-session-token', sessionToken);
+            
+            return sessionToken;
+        } catch (error) {
+            console.error('Failed to generate session token:', error);
+            throw new Error('Unable to authenticate with Olexi server. Please try again.');
+        }
+    }
+
+    // (No API key required on the client; server-side holds any credentials it needs.)
 
     // --- UI ---
     const chatContainer = document.createElement('div');
@@ -151,9 +229,8 @@
         inputField.value = ''; inputField.style.height = 'auto';
         showLoadingIndicator();
         try {
-            const apiKey = await getApiKey();
             removeProcessingIndicator(); // clean up any stale processing banner
-            await streamSession(userPrompt, apiKey);
+            await streamSession(userPrompt);
         } catch (error) {
             removeLoadingIndicator();
             removeProcessingIndicator();
@@ -198,12 +275,14 @@
     }
 
     // --- Streaming SSE over POST to /session/research ---
-    async function streamSession(prompt, apiKey) {
+    async function streamSession(prompt) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 120000);
         let shareUrl = null;
         try {
             const base = await resolveHostBase();
+            const fingerprint = await generateInstallationFingerprint();
+            const token = await getOrCreateSessionToken();
             let res;
             try {
                 res = await fetch(base + '/session/research', {
@@ -211,8 +290,9 @@
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'text/event-stream',
-                    'X-API-Key': apiKey,
-                    'X-Extension-Id': 'olexi-local'
+                    'X-Extension-Id': 'olexi-local',
+                    'X-Extension-Fingerprint': fingerprint,
+                    'X-Session-Token': token
                 },
                 mode: 'cors',
                 credentials: 'omit',
@@ -225,7 +305,21 @@
             }
             if (!res.ok || !res.body) {
                 let detail = '';
-                try { detail = await res.text(); } catch {}
+                try { 
+                    const errorData = await res.json();
+                    detail = errorData.detail || '';
+                } catch {
+                    try { detail = await res.text(); } catch {}
+                }
+                
+                // Handle token-related errors
+                if (res.status === 401 && detail.includes('token')) {
+                    // Clear stored token and try to get a new one
+                    localStorage.removeItem('olexi-session-token');
+                    sessionToken = null;
+                    throw new Error('Session expired. Please try your request again.');
+                }
+                
                 throw new Error(detail || res.statusText || `HTTP ${res.status}`);
             }
             const ctype = (res.headers && res.headers.get && res.headers.get('content-type')) || '';
@@ -348,8 +442,7 @@
                 displayMessage(prompt, 'user');
                 showLoadingIndicator();
                 removeProcessingIndicator();
-                const apiKey = await getApiKey();
-                await streamSession(prompt, apiKey);
+                await streamSession(prompt);
             }
         } catch {
             // ignore non-URL or unsupported

@@ -3,7 +3,7 @@
 Effective: 14 August 2025
 
 - The OLEXI Extension does not collect or store your personal data, browsing history, prompts, or research results.
-- The extension may store your API key locally (browser local storage) solely to make your usage easier; it is not sent to us.
+- The extension does not store any API keys. Only minimal UI settings may be stored locally in the browser.
 - Requests are sent to an Olexi Host you control (by default running locally). The host may involve third‑party services to fulfil your request:
   - Google Gemini (if configured) for planning and summarisation
   - AustLII (austlii.edu.au) for legal search results

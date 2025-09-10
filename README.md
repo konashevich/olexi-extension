@@ -17,7 +17,7 @@ A lightweight browser extension that acts as an MCP host UI for legal research o
 - Follow‑up questions: Each answer ends with “Questions you may want to explore further” (≥3 items). Questions are clickable and start a new session with that text.
 
 ## Security and privacy
-- Authorisation: The host requires an API key; the extension stores it locally (browser storage/localStorage). The MCP endpoint remains local and unauthenticated, exposing only tools.
+- Authorisation: The extension does not require or store any API key. The host holds any credentials (e.g., Google API key) via environment variables.
 - Request checks: The host enforces origin/ID/UA checks and simple rate‑limits. No end‑user credentials are sent to AustLII.
 
 ## Extension usage
@@ -40,7 +40,7 @@ Backend environment variables (set in the host server):
 - PREVIEW_STOPLIST — Comma‑separated words to exclude from preview items (optional)
 
 Extension settings:
-- API key is prompted on first use and stored locally. No external telemetry is sent.
+- No API key is required in the browser. No external telemetry is sent.
 
 ## MCP basics
 - Model Context Protocol (MCP) lets a host call tools over a standard interface. Here we use Streamable HTTP.
@@ -77,7 +77,7 @@ Notes on separation
 ## Troubleshooting
 - "No results" or thin previews: The host will fall back between modes; try a more specific prompt or click a follow‑up question.
 - Health timeouts: A warning is shown, but the session continues. Consider increasing `AUSTLII_TIMEOUT` or `AUSTLII_HEALTH_TIMEOUT` in the host.
-- Authorisation errors: Re‑enter the API key when prompted.
+- Connection errors: ensure the host is reachable and configured with required server-side credentials.
 
 ## License
 
