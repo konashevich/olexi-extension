@@ -1,0 +1,94 @@
+name: Deploy Server to Cloud Run
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'server/**'
+      - 'server/Dockerfile'
+      - 'requirements.txt'
+      - 'cloudbuild.olexi-extension-host.yaml'
+
+concurrency:
+  group: deploy-server-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+  # Fixed non-secret configuration (no GitHub secrets/vars required)
+  PROJECT_ID: olexi-extension
+  REGION: australia-southeast1
+  GAR_LOCATION: australia-southeast1
+  GAR_REPOSITORY: olexi-ext
+  SERVICE: olexi-extension-host
+  DEPLOY_SA: olexi-extension-host-runner@olexi-extension.iam.gserviceaccount.com
+  # Workload Identity Federation provider resource (project number 655512577217)
+  WIF_PROVIDER: "projects/655512577217/locations/global/workloadIdentityPools/gh-oidc-pool/providers/gh-provider-olexi-extension"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Auth to Google Cloud (OIDC)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.DEPLOY_SA }}
+
+      - name: Preflight check
+        run: |
+          set -euo pipefail
+          for v in PROJECT_ID REGION GAR_LOCATION GAR_REPOSITORY SERVICE DEPLOY_SA WIF_PROVIDER; do
+            if [ -z "${!v:-}" ]; then echo "Missing env: $v"; exit 1; fi
+          done
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${GAR_LOCATION}-docker.pkg.dev --quiet
+
+      - name: Compute image URI
+        run: echo "IMAGE_URI=${GAR_LOCATION}-docker.pkg.dev/${PROJECT_ID}/${GAR_REPOSITORY}/${SERVICE}" >> $GITHUB_ENV
+
+      - name: Build Docker image (server)
+        run: |
+          docker build \
+            -f server/Dockerfile \
+            -t "$IMAGE_URI:${{ github.sha }}" \
+            -t "$IMAGE_URI:latest" \
+            .
+
+      - name: Push image
+        run: |
+          docker push "$IMAGE_URI:${{ github.sha }}"
+          docker push "$IMAGE_URI:latest"
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --image="$IMAGE_URI:latest" \
+            --region="$REGION" \
+            --platform=managed \
+            --allow-unauthenticated \
+            --service-account="$DEPLOY_SA" \
+            --set-secrets=HOST_GOOGLE_API_KEY=olexi-host-google-api-key:latest \
+            --set-env-vars=TOKEN_LIFETIME_HOURS=24,DAILY_REQUEST_LIMIT=50,HOURLY_REQUEST_LIMIT=10 \
+            --quiet
+
+      - name: Output Service URL
+        run: |
+          URL=$(gcloud run services describe "$SERVICE" --region="$REGION" --format='value(status.url)')
+          echo "service_url=$URL" >> $GITHUB_OUTPUT
+        id: service
+
+      - name: Health check
+        run: |
+          curl -sS ${{ steps.service.outputs.service_url }}/ || exit 1
