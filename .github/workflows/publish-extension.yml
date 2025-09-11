@@ -1,0 +1,78 @@
+name: Publish Chrome Extension
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'webext/**'
+      - 'tools/package_extension.py'
+      - 'tools/cws_publish.py'
+      - '.github/workflows/publish-extension.yml'
+  workflow_dispatch: {}
+
+concurrency:
+  group: publish-extension-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install publish deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Package extension (zip)
+        env:
+          CLIENT_TOKEN: ${{ secrets.EXTENSION_CLIENT_TOKEN }}
+        run: |
+          python3 tools/package_extension.py
+          ls -l dist/
+
+      - name: Upload artifact (zip)
+        uses: actions/upload-artifact@v4
+        with:
+          name: webext-release
+          path: dist/webext-release.zip
+
+      - name: Preflight check for publish secrets
+        id: preflight
+        env:
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for v in CWS_CLIENT_ID CWS_CLIENT_SECRET CWS_REFRESH_TOKEN CWS_EXTENSION_ID; do
+            if [ -z "${!v:-}" ]; then echo "Missing $v"; missing=1; fi
+          done
+          if [ "$missing" -eq 1 ]; then echo "DRY_RUN=1" >> $GITHUB_ENV; else echo "DRY_RUN=0" >> $GITHUB_ENV; fi
+
+      - name: Dry-run publish (no secrets)
+        if: env.DRY_RUN == '1'
+        env:
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+        run: |
+          echo "Secrets missing; performing dry-run only."
+          python3 tools/cws_publish.py --zip dist/webext-release.zip ${CWS_EXTENSION_ID:+--extension-id $CWS_EXTENSION_ID} --dry-run
+
+      - name: Publish to Chrome Web Store
+        if: env.DRY_RUN != '1'
+        env:
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+        run: |
+          python3 tools/cws_publish.py --zip dist/webext-release.zip --extension-id "$CWS_EXTENSION_ID"

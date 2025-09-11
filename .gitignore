@@ -1,3 +1,8 @@
+## OAuth/Secrets (prevent committing client secrets)
+docs/client_secret_*.json
+client_secret_*.json
+*.secrets.json
+secrets/*.json
 # Node modules (if using npm/yarn)
 node_modules/
 
@@ -27,3 +32,4 @@ extension_api_keys.txt
 
 # Custom
 quickguide.md
+docs/client_secret_691931843514-mk2i2p0cu94o8q9edcto49iidbm6bth4.apps.googleusercontent.com.json
