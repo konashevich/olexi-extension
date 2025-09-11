@@ -89,6 +89,12 @@ def main() -> int:
         print(f"ZIP not found: {zip_path}", file=sys.stderr)
         return 2
 
+    if args.dry_run:
+        print("[DRY RUN] Would obtain access token and upload/publish:")
+        print(f"  ZIP: {zip_path}")
+        print(f"  Extension ID: {args.extension_id or '(new)'}")
+        return 0
+
     client_id = os.getenv("CWS_CLIENT_ID")
     client_secret = os.getenv("CWS_CLIENT_SECRET")
     refresh_token = os.getenv("CWS_REFRESH_TOKEN")
@@ -101,12 +107,6 @@ def main() -> int:
         print("Missing credentials: " + ", ".join(missing), file=sys.stderr)
         print("Set them in your environment. See docs/publish_via_api.md.")
         return 2
-
-    if args.dry_run:
-        print("[DRY RUN] Would obtain access token and upload/publish:")
-        print(f"  ZIP: {zip_path}")
-        print(f"  Extension ID: {args.extension_id or '(new)'}")
-        return 0
 
     # Cast to str after validation for type checkers
     client_id = str(client_id)
