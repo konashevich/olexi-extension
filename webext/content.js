@@ -248,15 +248,37 @@
         if (_resolvedHostBase) return _resolvedHostBase;
         if (_resolvingHostBase) return _resolvingHostBase;
         const candidates = [];
-        if (typeof window !== 'undefined' && window.OLEXI_HOST_URL) candidates.push(String(window.OLEXI_HOST_URL).replace(/\/$/, ''));
+        const prodHost = 'https://olexi-extension-host-655512577217.australia-southeast1.run.app';
+        const onAustlii = /austlii\.edu\.au$/i.test(location.hostname);
+        const isLocalPage = /^(localhost|127\.0\.0\.1)$/i.test(location.hostname);
+
+        // 1. Explicit override via global (e.g. injected by popup or page script)
+        if (typeof window !== 'undefined' && window.OLEXI_HOST_URL) {
+            candidates.push(String(window.OLEXI_HOST_URL).replace(/\/$/, ''));
+        }
+
+        // If we're actually on austlii.edu.au (normal user environment), try production FIRST to avoid waiting on localhost timeouts
+        if (onAustlii) {
+            candidates.push(prodHost);
+        }
+
+        // 2. Local dev candidates (only helpful for developers). We still include them for override cases.
         candidates.push('http://127.0.0.1:3000');
         candidates.push('http://localhost:3000');
-        candidates.push('https://olexi-extension-host-655512577217.australia-southeast1.run.app');
+        candidates.push('http://127.0.0.1:8080');
+        candidates.push('http://localhost:8080');
+
+        // 3. If not already added (e.g. local dev context), ensure production host appears once at the end as fallback
+        if (!candidates.includes(prodHost)) candidates.push(prodHost);
         _resolvingHostBase = (async () => {
+            const errors = [];
             for (const base of candidates) {
                 try {
                     const controller = new AbortController();
-                    const t = setTimeout(() => controller.abort(), 2500);
+                    // Adaptive timeout: keep production generous (4000ms, cold starts) but make local probes shorter when on AustLII page.
+                    const isLocalCandidate = /localhost|127\.0\.0\.1/.test(base);
+                    const timeoutMs = isLocalCandidate && onAustlii ? 1200 : 4000;
+                    const t = setTimeout(() => controller.abort(), timeoutMs);
                     const ping = await fetch(base + '/', {
                         method: 'GET',
                         headers: { 'Accept': 'application/json,*/*' },
@@ -267,9 +289,14 @@
                     });
                     clearTimeout(t);
                     if (ping.ok) { _resolvedHostBase = base; return base; }
-                } catch (_) { /* try next */ }
+                    errors.push(`${base} -> HTTP ${ping.status}`);
+                } catch (e) {
+                    errors.push(`${base} -> ${e && e.name === 'AbortError' ? 'timeout' : (e.message || 'error')}`);
+                }
             }
-            throw new Error('Olexi host is unreachable. If running locally, start the host or set window.OLEXI_HOST_URL.');
+            // Provide richer diagnostics to aid setup
+            console.warn('Olexi host resolution failed. Tried candidates:', errors);
+            throw new Error('Olexi host is unreachable. Start the host (uvicorn on port 3000 or 8080) or set window.OLEXI_HOST_URL before page load. Open DevTools console for diagnostics.');
         })();
         try { return await _resolvingHostBase; } finally { _resolvingHostBase = null; }
     }
