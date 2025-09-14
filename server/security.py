@@ -7,23 +7,31 @@ from typing import Optional
 from fastapi import HTTPException, Request
 
 def validate_chrome_extension_request(request: Request) -> bool:
-    """Validate that the request comes from a Chrome extension"""
-    
-    # Check origin header
-    origin = request.headers.get("origin")
-    if not origin or not origin.startswith("chrome-extension://"):
-        return False
-    
-    # Check user agent (should contain Chrome)
+    """Validate that the request comes from the trusted browser context.
+
+    Originally this only allowed chrome-extension:// origins. We now also allow
+    direct content-script initiated requests from austlii.edu.au pages, because
+    MV3 content scripts may present the page origin in the fetch Origin header.
+    Additional checks (Chrome UA and fingerprint header) remain required.
+    """
+    origin = request.headers.get("origin") or ""
     user_agent = request.headers.get("user-agent", "")
-    if not re.search(r'Chrome/\d+', user_agent):
+    fingerprint_present = bool(request.headers.get("x-extension-fingerprint"))
+
+    if not fingerprint_present:
         return False
-    
-    # Check for common extension headers
-    if not request.headers.get("x-extension-fingerprint"):
+
+    # Must look like Chrome
+    if not re.search(r"Chrome/\d+", user_agent):
         return False
-    
-    return True
+
+    # Accept either the extension origin or austlii.edu.au (any subdomain)
+    if origin.startswith("chrome-extension://"):
+        return True
+    if re.match(r"https://([a-z0-9-]+\.)*austlii\.edu\.au/?$", origin):
+        return True
+
+    return False
 
 def validate_fingerprint_format(fingerprint: str) -> bool:
     """Validate that the fingerprint has the expected format"""
