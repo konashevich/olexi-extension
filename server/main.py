@@ -81,6 +81,22 @@ async def privacy():
     raise HTTPException(status_code=404, detail="Privacy policy not found in this deployment")
 
 
+@app.get("/health", include_in_schema=False)
+async def health():
+    """Lightweight health & version probe used by deployment verification.
+
+    Returns commit metadata if provided via env (e.g., GIT_COMMIT_SHA) and basic
+    readiness indicators. Does not require extension headers (public).
+    """
+    return {
+        "ok": True,
+        "commit": os.getenv("GIT_COMMIT_SHA", "unknown"),
+        "image_build_id": os.getenv("BUILD_ID", "unknown"),
+        "mcp_url": os.getenv("MCP_URL", "unset"),
+        "host_ai_available": getattr(HOST_AI, "available", False),
+    }
+
+
 class ResearchRequest(BaseModel):
     prompt: str
     maxResults: int = 25
