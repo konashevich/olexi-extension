@@ -4,7 +4,7 @@
     // Build-time switch: when packaging for the Chrome Web Store the packager
     // will replace ALLOW_LOCAL_PROBES = true with false to avoid probing
     // developer localhost endpoints in the published build.
-    const ALLOW_LOCAL_PROBES = true; // replaced to false for release builds
+    const ALLOW_LOCAL_PROBES = false; // replaced to false for release builds
 
     if (document.getElementById('olexi-chat-container')) return; // run once
 
