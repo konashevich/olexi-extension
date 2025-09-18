@@ -1,7 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Olexi AI for AustLII",
-  "version": "1.0.6",
+  "version": "1.0.7",
+  "notes": "Release with local probes disabled",
   "description": "An AI-powered legal research assistant for the AustLII website.",
   "permissions": [],
   "host_permissions": [

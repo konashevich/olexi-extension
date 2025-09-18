@@ -1,6 +1,11 @@
 // content.js (Redesigned: agent-led, MCP-host style; no server-side AI calls)
 
 (function() {
+    // Build-time switch: when packaging for the Chrome Web Store the packager
+    // will replace ALLOW_LOCAL_PROBES = true with false to avoid probing
+    // developer localhost endpoints in the published build.
+    const ALLOW_LOCAL_PROBES = true; // replaced to false for release builds
+
     if (document.getElementById('olexi-chat-container')) return; // run once
 
     // --- Chat state ---
@@ -85,7 +90,11 @@
             const response = await fetch(base + '/session/token', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        // IMPORTANT: Security validator requires this header to allow the request
+                        'X-Extension-Fingerprint': fingerprint,
+                        // Optional future use / parity with research endpoint
+                        'X-Extension-Id': 'olexi-local'
                 },
                 mode: 'cors',
                 credentials: 'omit',

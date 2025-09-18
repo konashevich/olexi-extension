@@ -65,6 +65,15 @@ def main() -> int:
             replaced = original.replace("__CLIENT_TOKEN__", client_token)
             content_js_path.write_text(replaced, encoding="utf-8")
 
+        # Disable local probes in release build by replacing ALLOW_LOCAL_PROBES=true
+        if content_js_path.exists():
+            orig = content_js_path.read_text('utf-8')
+            tmp_js = orig
+            if 'ALLOW_LOCAL_PROBES = true' in orig:
+                new = orig.replace('ALLOW_LOCAL_PROBES = true', 'ALLOW_LOCAL_PROBES = false')
+                content_js_path.write_text(new, encoding='utf-8')
+                tmp_content_js = tmp_js if tmp_content_js is None else tmp_content_js
+
         OUTDIR.mkdir(parents=True, exist_ok=True)
 
         # Build ZIP of webext directory contents only

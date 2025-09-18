@@ -1,14 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Olexi AI for AustLII",
-  "version": "1.0",
+  "version": "1.0.8",
   "description": "An AI-powered legal research assistant for the AustLII website.",
   "permissions": [],
   "host_permissions": [
     "*://*.austlii.edu.au/*",
-  "http://127.0.0.1:3000/*",
-  "http://localhost:3000/*",
-  "https://olexi-extension-host-655512577217.australia-southeast1.run.app/*"
+    "https://olexi-extension-host-655512577217.australia-southeast1.run.app/*"
   ],
   "content_scripts": [
     {
