@@ -272,10 +272,12 @@
         }
 
         // 2. Local dev candidates (only helpful for developers). We still include them for override cases.
-        candidates.push('http://127.0.0.1:3000');
-        candidates.push('http://localhost:3000');
-        candidates.push('http://127.0.0.1:8080');
-        candidates.push('http://localhost:8080');
+        if (ALLOW_LOCAL_PROBES) {
+            candidates.push('http://127.0.0.1:3000');
+            candidates.push('http://localhost:3000');
+            candidates.push('http://127.0.0.1:8080');
+            candidates.push('http://localhost:8080');
+        }
 
         // 3. If not already added (e.g. local dev context), ensure production host appears once at the end as fallback
         if (!candidates.includes(prodHost)) candidates.push(prodHost);

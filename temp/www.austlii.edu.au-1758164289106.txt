@@ -1,0 +1,28 @@
+127.0.0.1:3000/:1 
+        
+        
+       Failed to load resource: net::ERR_CONNECTION_REFUSED
+localhost:3000/:1 
+        
+        
+       Failed to load resource: net::ERR_CONNECTION_REFUSED
+127.0.0.1:8080/:1 
+        
+        
+       Failed to load resource: net::ERR_CONNECTION_REFUSED
+localhost:8080/:1 
+        
+        
+       Failed to load resource: net::ERR_CONNECTION_REFUSED
+content.js:307 Olexi host resolution failed. Tried candidates: Array(5)
+(anonymous) @ content.js:307
+Show 1 more frame
+Show less
+content.js:246 Olexi Error: Error: Olexi host is unreachable. Start the host (uvicorn on port 3000 or 8080) or set window.OLEXI_HOST_URL before page load. Open DevTools console for diagnostics.
+    at content.js:308:19
+    at async resolveHostBase (content.js:310:22)
+    at async streamSession (content.js:319:26)
+    at async HTMLFormElement.<anonymous> (content.js:242:13)
+(anonymous) @ content.js:246
+Show 1 more frame
+Show less
